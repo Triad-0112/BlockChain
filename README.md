@@ -54,7 +54,7 @@ This application is run from the command line and has two main commands.
 To add a new block with some data to the chain, use the `addblock` command.
 
 ```bash
-go run main.go addblock -data "Send 1 GO to Shiraishi"
+go run main.go addblock -data "Send 1 GO to "
 ```
 
 **Output:**
@@ -79,12 +79,12 @@ go run main.go printchain
 **Example Output:**
 ```
 Prev. hash: 247b...
-Data: Send 5 more GO to Shiraishi
+Data: Send 5 more GO to 
 Hash: 000000...
 PoW: true
 
 Prev. hash: 000000...
-Data: Send 1 GO to Shiraishi
+Data: Send 1 GO to 
 Hash: 247b...
 PoW: true
 
