@@ -1,6 +1,6 @@
 module github.com/Triad-0112/BlockChain.git
 
-go 1.21.6
+go 1.24.0
 
 require github.com/dgraph-io/badger/v3 v3.2103.5
 
@@ -18,6 +18,7 @@ require (
 	github.com/klauspost/compress v1.12.3 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	go.opencensus.io v0.22.5 // indirect
-	golang.org/x/net v0.0.0-20201021035429-f5854403a974 // indirect
-	golang.org/x/sys v0.0.0-20221010170243-090e33056c14 // indirect
+	golang.org/x/crypto v0.43.0
+	golang.org/x/net v0.45.0 // indirect
+	golang.org/x/sys v0.37.0 // indirect
 )

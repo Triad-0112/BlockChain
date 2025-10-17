@@ -1,5 +1,3 @@
-// In blockchain/block.go
-
 package blockchain
 
 import (
@@ -7,37 +5,37 @@ import (
 	"crypto/sha256"
 	"encoding/gob"
 	"log"
-	"strconv"
 	"time"
 )
 
-// Block represents a single block in the blockchain.
 type Block struct {
 	Timestamp     int64
-	Data          []byte
+	Transactions  []*Transaction
 	PrevBlockHash []byte
 	Hash          []byte
 	Nonce         int
 }
 
-// SetHash calculates and sets the hash of the block.
-func (b *Block) SetHash() {
-	timestamp := []byte(strconv.FormatInt(b.Timestamp, 10))
-	headers := bytes.Join([][]byte{b.PrevBlockHash, b.Data, timestamp}, []byte{})
-	hash := sha256.Sum256(headers)
-	b.Hash = hash[:]
+func (b *Block) HashTransactions() []byte {
+	var txHashes [][]byte
+	var txHash [32]byte
+
+	for _, tx := range b.Transactions {
+		txHashes = append(txHashes, tx.ID)
+	}
+	txHash = sha256.Sum256(bytes.Join(txHashes, []byte{}))
+
+	return txHash[:]
 }
 
-// NewBlock creates and returns a new Block.
-func NewBlock(data string, prevBlockHash []byte) *Block {
+func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 	block := &Block{
 		Timestamp:     time.Now().Unix(),
-		Data:          []byte(data),
+		Transactions:  transactions,
 		PrevBlockHash: prevBlockHash,
 		Hash:          []byte{},
-		Nonce:         0, // Will be set by Proof of Work
+		Nonce:         0,
 	}
-	// We'll run the proof of work to find a valid hash and nonce
 	pow := NewProofOfWork(block)
 	nonce, hash := pow.Run()
 
@@ -46,9 +44,8 @@ func NewBlock(data string, prevBlockHash []byte) *Block {
 	return block
 }
 
-// NewGenesisBlock creates the first block in the chain.
-func NewGenesisBlock() *Block {
-	return NewBlock("Genesis Block", []byte{})
+func NewGenesisBlock(coinbase *Transaction) *Block {
+	return NewBlock([]*Transaction{coinbase}, []byte{})
 }
 
 func (b *Block) Serialize() []byte {
@@ -62,7 +59,6 @@ func (b *Block) Serialize() []byte {
 
 	return result.Bytes()
 }
-
 func DeserializeBlock(d []byte) *Block {
 	var block Block
 	decoder := gob.NewDecoder(bytes.NewReader(d))

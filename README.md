@@ -1,118 +1,137 @@
-# BlockChain
+# GoChain ⛓️
 
-A simple, educational blockchain implementation written in Go. This project demonstrates the core concepts of a blockchain, including blocks, hashing, Proof-of-Work, and data persistence.
+A functional cryptocurrency model built from scratch in Go. This project is an educational deep dive into the core mechanics of a blockchain, demonstrating how wallets, addresses, transactions, and mining work together to create a decentralized ledger.
 
-This is a command-line application designed to be a clear and understandable example of how a blockchain works under the hood.
+This command-line application simulates a complete cryptocurrency workflow, from creating the first block (genesis) to sending coins between user-generated wallets.
 
 ---
 
 ## ## Features
 
-* **Immutable Ledger:** A chain of blocks linked cryptographically.
-* **Proof-of-Work (PoW):** A consensus algorithm to secure the blockchain by requiring computational effort ("mining") to add new blocks.
-* **Data Persistence:** Uses **BadgerDB** (a key-value store in Go) to save the blockchain's state, so your data persists between sessions.
-* **Command-Line Interface (CLI):** Simple and intuitive commands to interact with the blockchain.
-* **Modular Design:** The code is structured with a clear separation of concerns, making it easy to read, understand, and extend.
+* **Wallet Generation:** Creates and manages wallets with ECDSA public/private key pairs.
+* **Base58 Addresses:** Generates human-readable, checksummed public addresses from wallets, similar to Bitcoin.
+* **UTXO Transaction Model:** Tracks coin ownership through Unspent Transaction Outputs, just like Bitcoin. No traditional accounts are used.
+* **Proof-of-Work (PoW):** Secures the blockchain by requiring computational effort ("mining") to add new blocks of transactions.
+* **Data Persistence:** Uses **BadgerDB** to save the blockchain's state, ensuring all data persists between sessions.
+* **Command-Line Interface (CLI):** A complete set of commands to create wallets, manage the blockchain, check balances, and send coins.
 
 ---
 
 ## ## Requirements
 
-To run this project, you only need:
 * **Go** (version 1.18 or newer is recommended).
 
-All dependencies are managed by Go Modules.
+All other dependencies are managed by Go Modules.
 
 ---
 
-## ## Installation & Setup
+## ## Quick Start & Workflow
 
-1.  **Clone the repository:**
-    ```bash
-    git clone [https://github.com/YOUR_USERNAME/go-blockchain.git](https://github.com/YOUR_USERNAME/go-blockchain.git)
-    ```
+Here’s a complete workflow demonstrating how to use GoChain from start to finish.
 
-2.  **Navigate to the project directory:**
-    ```bash
-    cd go-blockchain
-    ```
+### ### 1. Create Wallets
 
-3.  **Install the dependencies:**
-    Go will automatically download the necessary dependencies (like BadgerDB) when you build or run the project. You can also do it manually:
-    ```bash
-    go mod tidy
-    ```
+First, you need a sender and a receiver. Let's create two wallets.
+
+```bash
+# Create the first wallet
+go run main.go createwallet
+# Output: Your new address: 1Abc... (Copy this address)
+
+# Create the second wallet
+go run main.go createwallet
+# Output: Your new address: 1Xyz... (Copy this address too)
+```
+
+### ### 2. Create the Blockchain
+
+Initialize the blockchain. The very first block (the "genesis block") will contain a coinbase transaction that sends a mining reward to the address you specify.
+
+```bash
+# Use your first address to receive the reward
+go run main.go createblockchain -address 1Abc...
+```
+
+### ### 3. Check the Initial Balance
+
+Verify that the first wallet received the mining reward.
+
+```bash
+go run main.go getbalance -address 1Abc...
+# Expected Output: Balance of '1Abc...': 100
+```
+
+### ### 4. Send Coins
+
+Now, send some coins from the first wallet to the second. This will create a new transaction, mine a new block to include it, and add it to the chain.
+
+```bash
+go run main.go send -from 1Abc... -to 1Xyz... -amount 25
+```
+
+### ### 5. Verify the Final Balances
+
+Check the balances again to confirm the transaction was successful.
+
+```bash
+# Check the sender's new balance (100 - 25 = 75)
+go run main.go getbalance -address 1Abc...
+# Expected Output: Balance of '1Abc...': 75
+
+# Check the receiver's new balance
+go run main.go getbalance -address 1Xyz...
+# Expected Output: Balance of '1Xyz...': 25
+```
 
 ---
 
-## ## Usage
+## ## All Commands
 
-This application is run from the command line and has two main commands.
+* `createwallet`
+    * Generates a new wallet and saves it to `wallets.dat`.
 
-### ### Adding a Block
+* `listaddresses`
+    * Lists all addresses stored in the wallet file.
 
-To add a new block with some data to the chain, use the `addblock` command.
+* `createblockchain -address <ADDRESS>`
+    * Creates a new blockchain and sends the genesis block reward to the specified address.
 
-```bash
-go run main.go addblock -data "Send 1 GO to "
-```
+* `getbalance -address <ADDRESS>`
+    * Gets the balance of an address by summing its unspent transaction outputs (UTXOs).
 
-**Output:**
-The program will print "Mining a new block" and then the hash of the mined block, followed by a success message. The first time you run this, it will also create the Genesis block.
+* `send -from <SENDER> -to <RECEIVER> -amount <AMOUNT>`
+    * Creates a transaction, mines a new block, and sends coins.
 
-```
-No existing blockchain found. Creating a new one...
-Mining a new block
-000000...
-Mining a new block
-000000...
-Success! A new block has been added.
-```
-
-### ### Printing the Blockchain
-
-To view all the blocks currently in your blockchain, use the `printchain` command. It will print the blocks from newest to oldest.
-
-```bash
-go run main.go printchain
-```
-**Example Output:**
-```
-Prev. hash: 247b...
-Data: Send 5 more GO to 
-Hash: 000000...
-PoW: true
-
-Prev. hash: 000000...
-Data: Send 1 GO to 
-Hash: 247b...
-PoW: true
-
-Prev. hash:
-Data: Genesis Block
-Hash: 000000...
-PoW: true
-```
+* `printchain`
+    * Prints all the blocks and the transactions within them.
 
 ---
 
 ## ## Project Structure
 
-The project is organized to separate the core blockchain logic from the user interface.
-
 ```
 go-blockchain/
-├── blockchain/         # Contains all core blockchain logic
-│   ├── block.go        # Defines the Block struct and serialization
-│   ├── blockchain.go   # Manages the chain and database interaction
-│   └── proofofwork.go  # Implements the Proof-of-Work algorithm
-│
-├── cli/                # Handles command-line interface logic
-│   └── cli.go
-│
+├── blockchain/         # Core blockchain logic (blocks, PoW, transactions)
+├── cli/                # Command-line interface logic
+├── utils/              # Helper functions like Base58 encoding
+├── wallet/             # Wallet and address generation logic
 ├── tmp/                # Stores the BadgerDB database files (auto-generated)
-│
-├── go.mod              # Manages project dependencies
-├── go.sum
-└── main.go             # Entry point of the application
+├── wallets.dat         # Stores wallet data (auto-generated)
+└── ...
+```
+
+---
+
+## ## License
+
+This project is licensed under the MIT License.
+
+```
+MIT License
+
+Copyright (c) 2025 Panji Tri Wahyudi
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction...
 ```

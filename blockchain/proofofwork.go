@@ -9,17 +9,13 @@ import (
 	"strconv"
 )
 
-// The target difficulty for mining. A higher number means less difficult.
-// We are aiming for a hash with 24 leading zero bits.
 const targetBits = 24
 
-// ProofOfWork represents a proof-of-work challenge.
 type ProofOfWork struct {
 	block  *Block
-	target *big.Int // The target value the hash must be less than.
+	target *big.Int
 }
 
-// NewProofOfWork builds and returns a ProofOfWork.
 func NewProofOfWork(b *Block) *ProofOfWork {
 	target := big.NewInt(1)
 	target.Lsh(target, uint(256-targetBits))
@@ -28,12 +24,11 @@ func NewProofOfWork(b *Block) *ProofOfWork {
 	return pow
 }
 
-// prepareData prepares the data for hashing.
 func (pow *ProofOfWork) prepareData(nonce int) []byte {
 	data := bytes.Join(
 		[][]byte{
 			pow.block.PrevBlockHash,
-			pow.block.Data,
+			pow.block.HashTransactions(),
 			[]byte(strconv.FormatInt(pow.block.Timestamp, 10)),
 			[]byte(strconv.FormatInt(int64(targetBits), 10)),
 			[]byte(strconv.FormatInt(int64(nonce), 10)),
@@ -43,7 +38,6 @@ func (pow *ProofOfWork) prepareData(nonce int) []byte {
 	return data
 }
 
-// Run performs the proof-of-work calculation.
 func (pow *ProofOfWork) Run() (int, []byte) {
 	var hashInt big.Int
 	var hash [32]byte
@@ -56,7 +50,6 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 		hashInt.SetBytes(hash[:])
 
 		if hashInt.Cmp(pow.target) == -1 {
-			// Found a valid hash!
 			fmt.Printf("\r%x\n", hash)
 			break
 		} else {
@@ -68,7 +61,6 @@ func (pow *ProofOfWork) Run() (int, []byte) {
 	return nonce, hash[:]
 }
 
-// Validate checks if the proof-of-work is valid.
 func (pow *ProofOfWork) Validate() bool {
 	var hashInt big.Int
 	data := pow.prepareData(pow.block.Nonce)
