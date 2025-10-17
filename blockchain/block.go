@@ -14,6 +14,7 @@ type Block struct {
 	PrevBlockHash []byte
 	Hash          []byte
 	Nonce         int
+	Difficulty    int
 }
 
 func (b *Block) HashTransactions() []byte {
@@ -28,13 +29,14 @@ func (b *Block) HashTransactions() []byte {
 	return txHash[:]
 }
 
-func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
+func NewBlock(transactions []*Transaction, prevBlockHash []byte, difficulty int) *Block {
 	block := &Block{
 		Timestamp:     time.Now().Unix(),
 		Transactions:  transactions,
 		PrevBlockHash: prevBlockHash,
 		Hash:          []byte{},
 		Nonce:         0,
+		Difficulty:    difficulty,
 	}
 	pow := NewProofOfWork(block)
 	nonce, hash := pow.Run()
@@ -45,7 +47,7 @@ func NewBlock(transactions []*Transaction, prevBlockHash []byte) *Block {
 }
 
 func NewGenesisBlock(coinbase *Transaction) *Block {
-	return NewBlock([]*Transaction{coinbase}, []byte{})
+	return NewBlock([]*Transaction{coinbase}, []byte{}, startDifficulty)
 }
 
 func (b *Block) Serialize() []byte {

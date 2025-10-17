@@ -2,21 +2,27 @@ package blockchain
 
 import (
 	"bytes"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
+	"fmt"
 	"log"
+	"strings"
+
+	"github.com/Triad-0112/BlockChain.git/utils"
+	"github.com/Triad-0112/BlockChain.git/wallet"
 )
 
 type TXOutput struct {
-	Value      int
-	PubKeyHash []byte
+	Value        int
+	ScriptPubKey []byte
 }
 
 type TXInput struct {
-	Txid      []byte
-	Vout      int
-	ScriptSig string
+	Txid   []byte
+	Vout   int
+	PubKey []byte
 }
 
 type Transaction struct {
@@ -40,23 +46,30 @@ func (tx *Transaction) SetID() {
 
 func NewCoinbaseTX(to, data string) *Transaction {
 	if data == "" {
-		data = "Reward to " + to
+		randData := make([]byte, 20)
+		_, err := rand.Read(randData)
+		if err != nil {
+			log.Panic(err)
+		}
+		data = fmt.Sprintf("%x", randData)
 	}
 
-	txin := TXInput{[]byte{}, -1, data}
-	txout := TXOutput{100, []byte(to)}
+	txin := TXInput{[]byte{}, -1, []byte(data)}
+	txout := TXOutput{100, nil}
+	txout.Lock([]byte(to))
 	tx := Transaction{nil, []TXInput{txin}, []TXOutput{txout}}
 	tx.SetID()
 
 	return &tx
 }
 
-func (in *TXInput) CanUnlockOutputWith(unlockingData string) bool {
-	return in.ScriptSig == unlockingData
+func (in *TXInput) CanUnlockOutputWith(pubKeyHash []byte) bool {
+	lockingHash := wallet.HashPubKey(in.PubKey)
+	return bytes.Equal(lockingHash, pubKeyHash)
 }
 
-func (out *TXOutput) CanBeUnlockedWith(unlockingData []byte) bool {
-	return bytes.Equal(out.PubKeyHash, unlockingData)
+func (out *TXOutput) CanBeUnlockedWith(pubKeyHash []byte) bool {
+	return bytes.Equal(out.ScriptPubKey, pubKeyHash)
 }
 
 func (tx *Transaction) IsCoinbase() bool {
@@ -67,7 +80,14 @@ func NewUTXOTransaction(from, to string, amount int, bc *Blockchain) (*Transacti
 	var inputs []TXInput
 	var outputs []TXOutput
 
-	acc, validOutputs := bc.FindSpendableOutputs(from, amount)
+	wallets, err := wallet.NewWallets()
+	if err != nil {
+		return nil, err
+	}
+	w := wallets.GetWallet(from)
+	pubKeyHash := wallet.HashPubKey(w.PublicKey)
+
+	acc, validOutputs := bc.FindSpendableOutputs(pubKeyHash, amount)
 
 	if acc < amount {
 		log.Panic("ERROR: Not enough funds")
@@ -76,21 +96,51 @@ func NewUTXOTransaction(from, to string, amount int, bc *Blockchain) (*Transacti
 	for txid, outs := range validOutputs {
 		txID, err := hex.DecodeString(txid)
 		if err != nil {
-			log.Panic(err)
+			return nil, err
 		}
 		for _, out := range outs {
-			input := TXInput{txID, out, from}
+			input := TXInput{txID, out, w.PublicKey}
 			inputs = append(inputs, input)
 		}
 	}
-
-	outputs = append(outputs, TXOutput{amount, []byte(to)})
+	out := TXOutput{amount, nil}
+	out.Lock([]byte(to))
+	outputs = append(outputs, out)
 	if acc > amount {
-		outputs = append(outputs, TXOutput{acc - amount, []byte(from)})
+		changeOut := TXOutput{acc - amount, nil}
+		changeOut.Lock([]byte(from))
+		outputs = append(outputs, changeOut)
 	}
 
 	tx := Transaction{nil, inputs, outputs}
 	tx.SetID()
 
 	return &tx, nil
+}
+
+func (out *TXOutput) Lock(address []byte) {
+	pubKeyHash := utils.Base58Decode(address)
+	pubKeyHash = pubKeyHash[1 : len(pubKeyHash)-4]
+	out.ScriptPubKey = pubKeyHash
+}
+
+func (tx *Transaction) String() string {
+	var lines []string
+
+	lines = append(lines, fmt.Sprintf("--- Transaction %x:", tx.ID))
+
+	for i, input := range tx.Vin {
+		lines = append(lines, fmt.Sprintf("     Input %d:", i))
+		lines = append(lines, fmt.Sprintf("       TXID:      %x", input.Txid))
+		lines = append(lines, fmt.Sprintf("       Out:       %d", input.Vout))
+		lines = append(lines, fmt.Sprintf("       PublicKey: %x", input.PubKey))
+	}
+
+	for i, output := range tx.Vout {
+		lines = append(lines, fmt.Sprintf("     Output %d:", i))
+		lines = append(lines, fmt.Sprintf("       Value:  %d", output.Value))
+		lines = append(lines, fmt.Sprintf("       Script: %x", output.ScriptPubKey))
+	}
+
+	return strings.Join(lines, "\n")
 }

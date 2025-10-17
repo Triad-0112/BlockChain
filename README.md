@@ -1,137 +1,67 @@
-# GoChain ⛓️
+# GoChain ⛓️ - An Educational Blockchain
 
-A functional cryptocurrency model built from scratch in Go. This project is an educational deep dive into the core mechanics of a blockchain, demonstrating how wallets, addresses, transactions, and mining work together to create a decentralized ledger.
+A functional cryptocurrency model built from scratch in Go, repo at [https://github.com/Triad-0112/BlockChain](https://github.com/Triad-0112/BlockChain). This project is a deep dive into the core mechanics of a blockchain, demonstrating how wallets, addresses, transactions, Proof-of-Work, and dynamic difficulty adjustment work together.
 
-This command-line application simulates a complete cryptocurrency workflow, from creating the first block (genesis) to sending coins between user-generated wallets.
+This command-line application simulates a complete cryptocurrency workflow, from creating a genesis block to sending coins between wallets. It's an excellent learning tool for understanding the complexities of blockchain technology.
+
+**Note:** This project was built as an educational exercise and contains known bugs that highlight common challenges in blockchain development.
 
 ---
 
 ## ## Features
 
 * **Wallet Generation:** Creates and manages wallets with ECDSA public/private key pairs.
-* **Base58 Addresses:** Generates human-readable, checksummed public addresses from wallets, similar to Bitcoin.
-* **UTXO Transaction Model:** Tracks coin ownership through Unspent Transaction Outputs, just like Bitcoin. No traditional accounts are used.
-* **Proof-of-Work (PoW):** Secures the blockchain by requiring computational effort ("mining") to add new blocks of transactions.
-* **Data Persistence:** Uses **BadgerDB** to save the blockchain's state, ensuring all data persists between sessions.
-* **Command-Line Interface (CLI):** A complete set of commands to create wallets, manage the blockchain, check balances, and send coins.
+* **Base58 Addresses:** Generates human-readable, checksummed public addresses, similar to Bitcoin.
+* **UTXO Transaction Model:** Tracks coin ownership through Unspent Transaction Outputs.
+* **Dynamic Difficulty Adjustment:** The Proof-of-Work difficulty automatically adjusts to maintain a target block time, simulating one of Bitcoin's core features. 
+* **Data Persistence:** Uses **BadgerDB** to save the blockchain's state.
+* **CLI Block Explorer:** A `printchain` command that displays detailed information for every block and transaction.
 
 ---
 
-## ## Requirements
+## ## Known Issues & Bugs 🐞
 
-* **Go** (version 1.18 or newer is recommended).
+This project contains a critical bug related to balance calculation that serves as an excellent case study for debugging UTXO-based systems.
 
-All other dependencies are managed by Go Modules.
+### ### 1. Incorrect Sender Balance After Transaction
 
----
+When a user with multiple unspent outputs (e.g., from mining several blocks) sends coins, the sender's final balance is calculated incorrectly.
 
-## ## Quick Start & Workflow
+* **Symptom:** A user with a balance of `400` sends `75` coins. Their expected new balance is `325`. The program incorrectly reports a balance of `125`.
+* **Root Cause:** The `FindUTXO` function, which is responsible for calculating the balance, contains flawed accounting logic. When it scans the blockchain, it correctly identifies that an output has been spent. However, it then fails to correctly gather all of the *other remaining unspent outputs* that belong to the sender, leading to an inaccurate total.
 
-Here’s a complete workflow demonstrating how to use GoChain from start to finish.
+### ### 2. Duplicate Coinbase Transaction IDs
 
-### ### 1. Create Wallets
+If a user mines multiple blocks in quick succession, the coinbase transactions (which grant the mining reward) can end up with the **exact same transaction ID**.
 
-First, you need a sender and a receiver. Let's create two wallets.
-
-```bash
-# Create the first wallet
-go run main.go createwallet
-# Output: Your new address: 1Abc... (Copy this address)
-
-# Create the second wallet
-go run main.go createwallet
-# Output: Your new address: 1Xyz... (Copy this address too)
-```
-
-### ### 2. Create the Blockchain
-
-Initialize the blockchain. The very first block (the "genesis block") will contain a coinbase transaction that sends a mining reward to the address you specify.
-
-```bash
-# Use your first address to receive the reward
-go run main.go createblockchain -address 1Abc...
-```
-
-### ### 3. Check the Initial Balance
-
-Verify that the first wallet received the mining reward.
-
-```bash
-go run main.go getbalance -address 1Abc...
-# Expected Output: Balance of '1Abc...': 100
-```
-
-### ### 4. Send Coins
-
-Now, send some coins from the first wallet to the second. This will create a new transaction, mine a new block to include it, and add it to the chain.
-
-```bash
-go run main.go send -from 1Abc... -to 1Xyz... -amount 25
-```
-
-### ### 5. Verify the Final Balances
-
-Check the balances again to confirm the transaction was successful.
-
-```bash
-# Check the sender's new balance (100 - 25 = 75)
-go run main.go getbalance -address 1Abc...
-# Expected Output: Balance of '1Abc...': 75
-
-# Check the receiver's new balance
-go run main.go getbalance -address 1Xyz...
-# Expected Output: Balance of '1Xyz...': 25
-```
+* **Symptom:** The `printchain` command shows that several different blocks contain a coinbase transaction with an identical ID hash.
+* **Root Cause:** A transaction ID is a hash of its contents. If the miner's reward address is the same and the blocks are mined so quickly that the timestamp doesn't change, the resulting hash is identical. This breaks the UTXO model, because when an output from one of these transactions is spent, the system incorrectly flags the identical outputs in other blocks as spent too. This is a primary contributor to the incorrect balance calculation bug.
 
 ---
 
-## ## All Commands
+## ## How to Use
 
-* `createwallet`
-    * Generates a new wallet and saves it to `wallets.dat`.
+1.  **Clone & Tidy:**
+    ```bash
+    git clone [https://github.com/Triad-0112/BlockChain.git](https://github.com/Triad-0112/BlockChain.git)
+    cd BlockChain
+    go mod tidy
+    ```
 
-* `listaddresses`
-    * Lists all addresses stored in the wallet file.
+2.  **Create Wallets:**
+    ```bash
+    go run main.go createwallet
+    ```
 
-* `createblockchain -address <ADDRESS>`
-    * Creates a new blockchain and sends the genesis block reward to the specified address.
+3.  **Create the Blockchain:**
+    ```bash
+    go run main.go createblockchain -address <YOUR_ADDRESS>
+    ```
 
-* `getbalance -address <ADDRESS>`
-    * Gets the balance of an address by summing its unspent transaction outputs (UTXOs).
-
-* `send -from <SENDER> -to <RECEIVER> -amount <AMOUNT>`
-    * Creates a transaction, mines a new block, and sends coins.
-
-* `printchain`
-    * Prints all the blocks and the transactions within them.
-
----
-
-## ## Project Structure
-
-```
-go-blockchain/
-├── blockchain/         # Core blockchain logic (blocks, PoW, transactions)
-├── cli/                # Command-line interface logic
-├── utils/              # Helper functions like Base58 encoding
-├── wallet/             # Wallet and address generation logic
-├── tmp/                # Stores the BadgerDB database files (auto-generated)
-├── wallets.dat         # Stores wallet data (auto-generated)
-└── ...
-```
-
----
-
-## ## License
-
-This project is licensed under the MIT License.
-
-```
-MIT License
-
-Copyright (c) 2025 Panji Tri Wahyudi
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction...
-```
+4.  **Mine, Send, and Check Balances:**
+    ```bash
+    go run main.go mine -address <YOUR_ADDRESS>
+    go run main.go getbalance -address <YOUR_ADDRESS>
+    go run main.go send -from <SENDER> -to <RECEIVER> -amount <AMOUNT>
+    go run main.go printchain
+    ```

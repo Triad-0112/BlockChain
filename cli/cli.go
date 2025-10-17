@@ -24,6 +24,7 @@ func (cli *CLI) printUsage() {
 	fmt.Println("  printchain        - Print all the blocks of the blockchain")
 	fmt.Println("  send -from FROM -to TO -amount AMOUNT - Send AMOUNT of coins from FROM address to TO")
 	fmt.Println("  getbalance -address ADDRESS - Get balance of ADDRESS")
+	fmt.Println("  mine -address ADDRESS - Mine a new block and get a reward sent to ADDRESS")
 }
 
 func (cli *CLI) validateArgs() {
@@ -42,12 +43,14 @@ func (cli *CLI) Run() {
 	printChainCmd := flag.NewFlagSet("printchain", flag.ExitOnError)
 	sendCmd := flag.NewFlagSet("send", flag.ExitOnError)
 	getBalanceCmd := flag.NewFlagSet("getbalance", flag.ExitOnError)
+	mineCmd := flag.NewFlagSet("mine", flag.ExitOnError)
 
 	createBlockchainAddress := createBlockchainCmd.String("address", "", "The address to send genesis block reward to")
 	sendFrom := sendCmd.String("from", "", "Source wallet address")
 	sendTo := sendCmd.String("to", "", "Destination wallet address")
 	sendAmount := sendCmd.Int("amount", 0, "Amount to send")
 	getBalanceAddress := getBalanceCmd.String("address", "", "The address to get balance for")
+	mineAddress := mineCmd.String("address", "", "The miner's address to receive the reward")
 
 	switch os.Args[1] {
 	case "createblockchain":
@@ -80,6 +83,8 @@ func (cli *CLI) Run() {
 		if err != nil {
 			log.Panic(err)
 		}
+	case "mine":
+		_ = mineCmd.Parse(os.Args[2:])
 	default:
 		cli.printUsage()
 		os.Exit(1)
@@ -115,11 +120,22 @@ func (cli *CLI) Run() {
 		}
 		cli.getBalance(*getBalanceAddress)
 	}
+	if mineCmd.Parsed() {
+		if *mineAddress == "" {
+			mineCmd.Usage()
+			os.Exit(1)
+		}
+		cli.mine(*mineAddress)
+	}
 }
 
 func (cli *CLI) createBlockchain(address string) {
 	if !wallet.ValidateAddress(address) {
 		log.Panic("ERROR: Address is not valid")
+	}
+	if blockchain.DbExists() {
+		fmt.Println("Blockchain already exists.")
+		os.Exit(1)
 	}
 	bc := blockchain.NewBlockchain(address)
 	defer bc.CloseDB()
@@ -145,8 +161,13 @@ func (cli *CLI) listAddresses() {
 }
 
 func (cli *CLI) printChain() {
-	bc := blockchain.NewBlockchain("")
+	if !blockchain.DbExists() {
+		fmt.Println("No existing blockchain found. Create one first with 'createblockchain'.")
+		os.Exit(1)
+	}
+	bc := blockchain.OpenBlockchain()
 	defer bc.CloseDB()
+
 	bci := bc.Iterator()
 	for {
 		block := bci.Next()
@@ -155,13 +176,14 @@ func (cli *CLI) printChain() {
 		}
 		fmt.Printf("============ Block %x ============\n", block.Hash)
 		fmt.Printf("Prev. hash: %x\n", block.PrevBlockHash)
+		fmt.Printf("Difficulty: %d\n", block.Difficulty)
 		pow := blockchain.NewProofOfWork(block)
-		fmt.Printf("PoW: %t\n", pow.Validate())
-		fmt.Println("Transactions:")
+		fmt.Printf("PoW: %t\n\n", pow.Validate())
 		for _, tx := range block.Transactions {
-			fmt.Printf("  - Transaction %x\n", tx.ID)
+			fmt.Println(tx)
 		}
 		fmt.Printf("\n")
+
 		if len(block.PrevBlockHash) == 0 {
 			break
 		}
@@ -169,10 +191,15 @@ func (cli *CLI) printChain() {
 }
 
 func (cli *CLI) getBalance(address string) {
+	if !blockchain.DbExists() {
+		fmt.Println("No existing blockchain found. Create one first with 'createblockchain'.")
+		os.Exit(1)
+	}
 	if !wallet.ValidateAddress(address) {
 		log.Panic("ERROR: Address is not valid")
 	}
-	bc := blockchain.NewBlockchain(address)
+
+	bc := blockchain.OpenBlockchain()
 	defer bc.CloseDB()
 
 	balance := 0
@@ -181,6 +208,7 @@ func (cli *CLI) getBalance(address string) {
 	for _, out := range UTXOs {
 		balance += out.Value
 	}
+
 	fmt.Printf("Balance of '%s': %d\n", address, balance)
 }
 
@@ -192,13 +220,27 @@ func (cli *CLI) send(from, to string, amount int) {
 		log.Panic("ERROR: Recipient address is not valid")
 	}
 
-	bc := blockchain.NewBlockchain(from)
+	bc := blockchain.OpenBlockchain()
 	defer bc.CloseDB()
 
 	tx, err := blockchain.NewUTXOTransaction(from, to, amount, bc)
 	if err != nil {
 		log.Panic(err)
 	}
+
 	bc.MineBlock([]*blockchain.Transaction{tx})
 	fmt.Println("Success! Transaction sent.")
+}
+
+func (cli *CLI) mine(address string) {
+	if !wallet.ValidateAddress(address) {
+		log.Panic("ERROR: Address is not valid")
+	}
+	bc := blockchain.OpenBlockchain()
+	defer bc.CloseDB()
+
+	coinbaseTx := blockchain.NewCoinbaseTX(address, "Miner Reward")
+
+	bc.MineBlock([]*blockchain.Transaction{coinbaseTx})
+	fmt.Println("Success! New block mined and reward sent.")
 }
