@@ -8,7 +8,7 @@ This command-line application simulates a complete cryptocurrency workflow, from
 
 ---
 
-## ## Features
+## Features
 
 * **Wallet Generation:** Creates and manages wallets with ECDSA public/private key pairs.
 * **Base58 Addresses:** Generates human-readable, checksummed public addresses, similar to Bitcoin.
@@ -19,18 +19,18 @@ This command-line application simulates a complete cryptocurrency workflow, from
 
 ---
 
-## ## Known Issues & Bugs 🐞
+## Known Issues & Bugs 🐞
 
 This project contains a critical bug related to balance calculation that serves as an excellent case study for debugging UTXO-based systems.
 
-### ### 1. Incorrect Sender Balance After Transaction
+### 1. Incorrect Sender Balance After Transaction
 
 When a user with multiple unspent outputs (e.g., from mining several blocks) sends coins, the sender's final balance is calculated incorrectly.
 
 * **Symptom:** A user with a balance of `400` sends `75` coins. Their expected new balance is `325`. The program incorrectly reports a balance of `125`.
 * **Root Cause:** The `FindUTXO` function, which is responsible for calculating the balance, contains flawed accounting logic. When it scans the blockchain, it correctly identifies that an output has been spent. However, it then fails to correctly gather all of the *other remaining unspent outputs* that belong to the sender, leading to an inaccurate total.
 
-### ### 2. Duplicate Coinbase Transaction IDs
+### 2. Duplicate Coinbase Transaction IDs
 
 If a user mines multiple blocks in quick succession, the coinbase transactions (which grant the mining reward) can end up with the **exact same transaction ID**.
 
@@ -39,7 +39,7 @@ If a user mines multiple blocks in quick succession, the coinbase transactions (
 
 ---
 
-## ## How to Use
+## How to Use
 
 1.  **Clone & Tidy:**
     ```bash
